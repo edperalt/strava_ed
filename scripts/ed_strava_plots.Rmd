@@ -1,0 +1,116 @@
+---
+title: "Actividades en Strava y Garmin"
+author: "Edmundo"
+date: "1/26/2021"
+output:
+   html_document:
+     thene: readable
+     keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(strava)
+library(tidyverse)
+```
+
+
+```{r echo=FALSE}
+
+## data loading
+
+data <- process_data("../raw_data/gpx/")
+
+data_clean <- data %>% filter(id != 287, id != 338, id != 102, id != 103, id != 278)
+
+
+```
+
+# WORK IN PROGRESS
+
+
+# Resumen de todas las trazas
+
+De Strava podemos extraer todas las trazas e mltiples deportes o actividades, aqui estan las de mi base de datos. En realidad por ahora faltan los ultimos años ya que ha cambiado la forma de exportar la data de Strava, y tengo que transformar los .FIT que exporta masivamente Strava a GPX. solo un poco de paciencia.
+
+
+```{r echo=FALSE}
+plot_facets(data_clean,labels = TRUE)
+```
+
+
+```{r echo=FALSE}
+
+# plot_calendar(data_clean, unit = "time")
+
+
+```
+
+
+
+```{r echo=FALSE}
+# library(lubridate) 
+# # plot_ridges(data_clean %>% filter(time > ymd_hms("2020-01-01 01:30:00")))
+# plot_ridges(data_clean)
+
+```
+
+
+```{r echo=FALSE}
+
+# plot_packed_circles(data_clean)
+
+
+```
+
+
+# Heat map
+
+## Madrid
+
+En el siguiente mapa se puede ver un heat map de algunas de mis actividades en Madrid.  
+```{r echo=FALSE}
+puntos_interesantes = tibble( lugar = c("Casa", "Velódromo", "Picina", "la oficina"),
+                              lon = c(    -3.647,      -3.646,   -3.618,      -3.688   ),
+                              lat = c(    40.521,      40.552,  40.5375,     40.4755 )
+                              )
+```
+
+
+ 
+```{r echo=FALSE, fig.width=12}
+
+
+
+lon_min = -3.6 
+lon_max = -3.75 
+lat_min = 40.46
+lat_max = 40.56
+  # geom_hline(yintercept = 40.552, color = "blue")+ geom_vline(xintercept = -3.646, color = "blue")+
+  # geom_vline(xintercept = -3.647, color = "red")+geom_hline(yintercept = 40.521, color = "red")+
+  # geom_hline(yintercept = 40.5375, color = "yellow")+geom_vline(xintercept =  -3.618, color = "yellow")+
+  # geom_vline(xintercept = -3.688, color = "brown")+geom_hline(yintercept = 40.4755, color = "brown")
+
+  
+
+  data_clean %>%
+    ggplot(aes(lon, lat)) +
+    geom_path(aes(group = id),
+      alpha = 0.3,
+      size = 0.3,
+      lineend = "round"
+    ) +
+    coord_map(xlim = c(lon_min, lon_max), ylim = c(lat_min, lat_max)) +
+    geom_point(data = puntos_interesantes , aes(lon, lat), color = "red", size = 4, alpha = 0.5)+
+    geom_label(data =puntos_interesantes,aes( x=lon,  y=lat, label=  lugar) , nudge_x = 0.003, nudge_y = 0.004) +
+    theme_void()
+
+
+
+```
+  
+  
