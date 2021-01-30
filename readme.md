@@ -1,14 +1,3 @@
----
-title: "Actividades en Strava y Garmin"
-author: "Edmundo"
-date: "1/26/2021"
-output:
-   html_document:
-     thene: readable
-     keep_md: yes
----
-
-
 
 
 
