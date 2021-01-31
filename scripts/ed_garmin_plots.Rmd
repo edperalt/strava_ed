@@ -1,0 +1,331 @@
+---
+title: "Actividades en Strava y Garmin"
+author: "Edmundo"
+date: "1/26/2021"
+output:
+   html_document:
+     thene: readable
+     keep_md: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(strava)
+library(tidyverse)
+library(DT)
+```
+
+Hace mucho tiempo que he querido hacer un "heat map" con mis datos deportivos, y este proyecto ha sido una de las motivaciones para aprender mas a programar. la siguiente imagen es una heatmap generado con Strava.
+
+![Strava ed heatmap](../raw_data/images/Strava_heat_map_ed.png)
+
+Hace unos de años encontré el repo de [Marcus Volz](https://github.com/marcusvolz/strava) donde tiene un app para leer archivos gpx y hacer unaserie de gráficos muy interesantes para analizar los datos, sin embargo Strava cambió el formato en el que exporta los datos.
+
+En mi caso en el que mis actividades vienen de garmin, he conseguido un script de [python](https://www.python.org/) que se llama [garmin-connect-export](https://github.com/pe-st/garmin-connect-export), este me ha exportado los gpx y algunos archivos adicionales, de los cuales vamos a revisar por ahora el Activities.csv que es la salida de la tabla resumen que vemos en Garmin Connect.
+
+```{r funcion para cargar los gpx, warning=FALSE, echo=FALSE, message=FALSE}
+
+
+# This code is adapted from https://github.com/marcusvolz/strava/blob/master/R/process_data.R to add the option to capture the Activity ID from the gpx file name.
+
+process_data_ed <- function(path, old_gpx_format = FALSE) {
+  # Function for processing a Strava gpx file
+  process_gpx <- function(file) {
+    # Parse GPX file and generate R structure representing XML tree
+    pfile <- XML::htmlTreeParse(file = file,
+                           error = function (...) {},
+                           useInternalNodes = TRUE)
+
+    coords <- XML::xpathSApply(pfile, path = "//trkpt", XML::xmlAttrs)
+    # extract the activity type from file name
+    type <- stringr::str_match(file, ".*-(.*).gpx")[[2]]
+    id_2 <- str_extract(file, "\\-*\\d+\\.*\\d*")
+    # Check for empty file.
+    if (length(coords) == 0) return(NULL)
+    # dist_to_prev computation requires that there be at least two coordinates.
+    if (ncol(coords) < 2) return(NULL)
+
+    lat <- as.numeric(coords["lat", ])
+    lon <- as.numeric(coords["lon", ])
+
+    if (old_gpx_format == TRUE) {
+      ele <- as.numeric(XML::xpathSApply(pfile, path = "//trkpt/ele", XML::xmlValue))
+    }
+
+    time <- XML::xpathSApply(pfile, path = "//trkpt/time", XML::xmlValue)
+
+    # Put everything in a data frame
+    if (old_gpx_format == TRUE) {
+      result <- data.frame(lat = lat, lon = lon, ele = ele, time = time, type = type)
+    } else {
+      result <- data.frame(lat = lat, lon = lon, time = time, type = type, id_2 = id_2)
+    }
+    result <- result %>%
+      dplyr::mutate(dist_to_prev = c(0, sp::spDists(x = as.matrix(.[, c("lon", "lat")]), longlat = TRUE, segments = TRUE)),
+                    cumdist = cumsum(dist_to_prev),
+                    time = as.POSIXct(.$time, tz = "GMT", format = "%Y-%m-%dT%H:%M:%OS")) %>%
+      dplyr::mutate(time_diff_to_prev = as.numeric(difftime(time, dplyr::lag(time, default = .$time[1]))),
+                    cumtime = cumsum(time_diff_to_prev))
+    result
+  }
+
+  # Process all the files
+  data <- gtools::mixedsort(list.files(path = path, pattern = "*.gpx", full.names = TRUE)) %>%
+    purrr::map_df(process_gpx, .id = "id") %>%
+    dplyr::mutate(id = as.integer(id),
+                  id_2 = as.integer((id_2)))
+}
+```
+
+```{r cargar los gpx, echo=FALSE, message=FALSE, warning=FALSE}
+
+## Cargar los GPX 
+
+data <- process_data_ed("../raw_data/garmin/gpx/")
+data_ed<- data %>% mutate(id_text = as.character(id)) 
+
+
+
+```
+
+```{r cargar el csv , echo=FALSE, warning=FALSE, message=FALSE }
+
+## Cargamos el CSV resumen que exporta Garmin. 
+
+
+all_data <- read_csv("../raw_data/garmin/csv/2021_jan_activities.csv", 
+    col_types = cols(`Start Time` = col_character(), 
+        `End Time` = col_character(), Description = col_character(), 
+        `Duration (h:m:s)` = col_time(format = "%H:%M:%S"), 
+        `Elapsed Duration (h:m:s)` = col_time(format = "%H:%M:%S"), 
+        `Moving Duration (h:m:s)` = col_time(format = "%H:%M:%S"), 
+        `Average Speed (km/h or min/km)` = col_double(), 
+        `Average Moving Speed (km/h or min/km)` = col_double(), 
+        `Max. Speed (km/h or min/km)` = col_double())) %>% 
+   mutate(Año = as.factor(substr(all_data$`Start Time` , start = 1, stop = 4) ) )
+
+
+## creamos este diccionario con activity ID para agregar el tipo de actividad al dataframe de los gpx 
+
+diccio <- all_data %>% select("Activity ID", "Activity Type", "Activity Parent", "Activity Name")
+```
+
+## Los datos
+
+### Archivo resumen
+
+Esta es la tabla con todos  mis entrenamientos, paseos, diversiones que tiene alguna medida en mi centa de garmin.
+
+```{r tabla resumen, echo=FALSE, warning=FALSE, message=FALSE}
+
+DT::datatable(all_data, rownames = FALSE, filter = "top", options = list(autoWidth = TRUE)) %>% 
+   formatRound("Average Speed (km/h or min/km)", 2) %>% 
+   formatRound("Max. Speed (km/h)", 2) %>% 
+   formatRound("Average Speed (km/h)", 2) %>% 
+   formatRound("Average Moving Speed (km/h)", 2) %>% 
+   formatRound("Avg. Temp (°C)", 2)
+   
+
+```
+
+
+vamos a revisar el tipo de actividades:   
+
+
+```{r echo=FALSE, fig.width=12, message=FALSE, warning=FALSE}
+
+all_data %>% mutate(`Activity Parent` = as.factor(`Activity Parent`),
+                    `Activity Type` = as.factor(`Activity Type`)
+                    ) %>% 
+   ggplot(aes( fct_rev(fct_infreq(`Activity Parent`) ) ) ) +
+   geom_bar(aes(fill = Año ) ) +
+   coord_flip()+
+   labs(y = "numero de actividades",
+        x = "", 
+        title =  "Actividades realizadas coloreadas por año"
+        )+
+   scale_fill_viridis_d()+
+   theme_minimal()
+
+
+
+
+```
+
+
+
+Ninguna sorpresa hasta ahora, no hay secretos sobre mi debilidad por la piscina, Garmin tiene otra variable que le da mas granularidad al tipo de deporte, veamos el cambio:  
+
+
+
+
+
+```{r fig.width=12}
+all_data <- 
+   all_data %>%
+   mutate(`Activity Type` = ifelse(`Activity Type` == "Swimming"                       , "Pool Swimming"             , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Gym & Fitness Equipment"        , "Strength Training"         , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Mountain Biking"                , "Cycling"                   , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Multisport"                     , "Other"                     , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Uncategorized"                  , "Other"                     , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Trail Running"                  , "Running"                   , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Stopwatch"                      , "Other"                     , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Road Cycling"                   , "Cycling"                   , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Transition"                     , "Other"                     , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Backcountry Skiing/Snowboarding", "Resort Skiing/Snowboarding", `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Cross Country Classic Skiing"   , "Resort Skiing/Snowboarding", `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Street Running"                 , "Running"                   , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Cardio"                         , "Gimnasio"                  , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Strength Training"              , "Gym"                       , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Indoor Rowing"                  , "Gym"                       , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Resort Skiing/Snowboarding"     , "Snowboarding"              , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Pool Swimming"                  , "Natación en piscina"       , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Running"                        , "Correr"                    , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Cycling"                        , "Ciclismo"                  , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Walking"                        , "Caminatas"                 , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Open Water Swimming"            , "Aguas Abiertas"            , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Mountain Biking"                , "Cycling"                   , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Boating"                        , "Others"                    , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Hiking"                         , "Senderismo"                , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Treadmill Running"              , "Correr en cinta"           , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Rowing"                         , "Gimnasio"                  , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Gym"                            , "Gimnasio"                  , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Others"                         , "Other"                     , `Activity Type`),
+          `Activity Type` = ifelse(`Activity Type` == "Indoor Cycling"                 , "Ciclismo"                   , `Activity Type`),
+          )      
+
+
+all_data %>% mutate(`Activity Parent` = as.factor(`Activity Parent`),
+                    `Activity Type` = as.factor(`Activity Type`)
+                    ) %>% 
+   ggplot(aes( fct_rev(fct_infreq(`Activity Type`) ) ) ) +
+   geom_bar(aes(fill = Año ) ) +
+   coord_flip()+
+   labs(y = "numero de actividades",
+        x = "", 
+        title =  "Actividades realizadas por año"
+        )+
+   scale_fill_viridis_d()+
+   scale_y_continuous(labels = seq(0, 1400, 200),
+                      breaks = seq(0, 1400, 200)
+                      )+
+   theme_minimal()
+
+
+
+```
+
+
+Aqui ya vemos algunas cosas, vamos a enumerar:  
+- Garmin, y la industria de los relojes de deporte no tuvieron un reloj para nadar hasta el 2013 :-), yo comencé con un [garmin swim](https://buy.garmin.com/es-ES/ES/p/97287) 
+- Empecé a incorporar el gimnasio de manera consistente como complemento a mis entrenamientos de natación en el 2016
+- El snowboard es una pasión reciente
+
+## y la natacion??
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+
+all_data %>% mutate(`Activity Parent` = as.factor(`Activity Parent`),
+                    `Activity Type` = as.factor(`Activity Type`)
+                    ) %>% 
+   drop_na(Strokes) %>% 
+   group_by(Año) %>% 
+   summarise(brazadas = sum(Strokes)) %>% 
+   ggplot(aes( Año, brazadas) ) +
+   geom_bar(stat = "identity", aes(fill= brazadas))  +
+   coord_flip()+
+   labs(y = "número de brazadas",
+        x = "", 
+        title =  "Brazadas por año"
+        )+
+   # scale_fill_viridis_d()+
+   # scale_y_continuous(labels = seq(0, 1400, 200),
+   #                    breaks = seq(0, 1400, 200)
+   #                    )+
+   theme_minimal()
+
+
+```
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+data_ed %>% 
+   group_by(id_text) %>% 
+   summarise(
+      max_time = max(cumtime, na.rm = TRUE),
+      max_distance = max(cumdist, na.rm = TRUE)
+   ) %>% 
+   # filter(max_time < 1e5) %>% 
+      ggplot(aes(max_time/3600))+   
+            geom_histogram(fill = "grey60")+
+   labs(x = " horas",
+        y = "Entrenos",
+        title = "Duración de los entrenamientos")+
+            
+   theme_minimal()
+
+
+
+```
+
+Es estoy seguro de no haber hecho ninguna actividad de ms de 5- 6 horas, así que filtramos el histograma.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+data_ed %>% 
+   group_by(id_text) %>% 
+   summarise(
+      max_time = max(cumtime, na.rm = TRUE),
+      max_distance = max(cumdist, na.rm = TRUE)
+   ) %>% 
+   filter(max_time < 1e5) %>%
+      ggplot(aes(max_time/3600))+   
+            geom_histogram(fill = "grey60")+
+   labs(x = " horas",
+        y = "Entrenos",
+        title = "Duración de los entrenamientos ")+
+            
+   theme_minimal()
+
+
+```
+
+# Distancia
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+data_ed %>% 
+   group_by(id_text) %>% 
+   summarise(
+      max_time = max(cumtime, na.rm = TRUE),
+      max_distance = max(cumdist, na.rm = TRUE)
+   ) %>% 
+   # filter(max_time < 1e5) %>%
+      ggplot(aes(max_distance))+   
+            geom_histogram(fill = "grey60")+
+   labs(x = "Km",
+        y = "Entrenos",
+        title = "Distancia de los entrenamientos ")+
+            
+   theme_minimal()
+
+```
+
+```{r}
+
+plot_facets(data_ed ,labels = FALSE, scales = "free")
+
+```
+
+```{r}
+library(lubridate)
+plot_ridges(data_ed %>% filter(time < ymd_hms("2016-01-01 01:30:00")) %>% filter(time > ymd_hms("2013-01-01 01:30:00")) )
+
+```

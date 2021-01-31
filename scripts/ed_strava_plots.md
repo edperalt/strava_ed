@@ -15,6 +15,17 @@ output:
 
 
 
+```
+## Warning: 85 parsing failures.
+## row        col   expected actual                                                file
+##   1 Avg HR     an integer     -- '../raw_data/garmin/2021_jan_garmin_activities.csv'
+##   1 Max HR     an integer     -- '../raw_data/garmin/2021_jan_garmin_activities.csv'
+##   1 Aerobic TE a number       -- '../raw_data/garmin/2021_jan_garmin_activities.csv'
+##   2 Avg HR     an integer     -- '../raw_data/garmin/2021_jan_garmin_activities.csv'
+##   2 Max HR     an integer     -- '../raw_data/garmin/2021_jan_garmin_activities.csv'
+## ... .......... .......... ...... ...................................................
+## See problems(...) for more details.
+```
 
 # WORK IN PROGRESS
 
@@ -47,5 +58,13 @@ En el siguiente mapa se puede ver un heat map de algunas de mis actividades en M
 
  
 ![](ed_strava_plots_files/figure-html/unnamed-chunk-8-1.png)<!-- -->
+  
+  
+  
+  
+## Bogota
+
+![](ed_strava_plots_files/figure-html/unnamed-chunk-9-1.png)<!-- -->
+
   
   

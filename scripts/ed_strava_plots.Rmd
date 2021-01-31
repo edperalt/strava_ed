@@ -27,7 +27,21 @@ data <- process_data("../raw_data/gpx/")
 
 data_clean <- data %>% filter(id != 287, id != 338, id != 102, id != 103, id != 278)
 
-
+ garmin_data <- X2021_jan_garmin_activities <- read_csv("../raw_data/garmin/2021_jan_garmin_activities.csv", 
+     col_types = cols(Date = col_datetime(format = "%Y-%m-%d %H:%M:%S"), 
+         Time = col_time(format = "%H:%M:%S"), 
+         `Avg HR` = col_integer(), `Max HR` = col_integer(), 
+         `Aerobic TE` = col_number(), `Avg Pace` = col_character(), 
+         `Avg Stride Length` = col_skip(), 
+         `Avg Vertical Ratio` = col_skip(), 
+         `Avg Vertical Oscillation` = col_skip(), 
+         `Training Stress Score®` = col_number(), 
+         Grit = col_skip(), Flow = col_skip(), 
+         `Total Strokes` = col_integer(), 
+         `Avg. Swolf` = col_integer(), `Climb Time` = col_skip(), 
+         `Bottom Time` = col_skip(), `Surface Interval` = col_skip(), 
+         Decompression = col_skip(), `Best Lap Time` = col_character(), 
+         `Number of Laps` = col_integer()))
 ```
 
 # WORK IN PROGRESS
@@ -112,5 +126,47 @@ lat_max = 40.56
 
 
 ```
+  
+  
+  
+  
+## Bogota
+
+```{r}
+
+
+
+lon_min = -73.95
+lon_max = -74.15 
+lat_min = 4.65
+lat_max = 4.85
+  # geom_hline(yintercept = 40.552, color = "blue")+ geom_vline(xintercept = -3.646, color = "blue")+
+  # geom_vline(xintercept = -3.647, color = "red")+geom_hline(yintercept = 40.521, color = "red")+
+  # geom_hline(yintercept = 40.5375, color = "yellow")+geom_vline(xintercept =  -3.618, color = "yellow")+
+  # geom_vline(xintercept = -3.688, color = "brown")+geom_hline(yintercept = 40.4755, color = "brown")
+
+  
+
+  data_clean %>%
+    ggplot(aes(lon, lat)) +
+    geom_path(aes(group = id),
+      alpha = 0.3,
+      size = 0.3,
+      lineend = "round"
+    ) +
+    coord_map(xlim = c(lon_min, lon_max), ylim = c(lat_min, lat_max)) +
+    # geom_vline(xintercept = lon_min)+
+    # geom_vline(xintercept = lon_max)+
+    # geom_hline(yintercept = lat_max)+
+    # geom_hline(yintercept = lat_min)+
+  
+    # geom_point(data = puntos_interesantes , aes(lon, lat), color = "red", size = 4, alpha = 0.5)+
+    # geom_label(data =puntos_interesantes,aes( x=lon,  y=lat, label=  lugar) , nudge_x = 0.003, nudge_y = 0.004) +
+    theme_void()
+
+
+
+```
+
   
   
