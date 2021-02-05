@@ -16,6 +16,8 @@ knitr::opts_chunk$set(echo = FALSE)
 library(strava)
 library(tidyverse)
 library(DT)
+library(scales)
+library(patchwork)
 ```
 
 Hace mucho tiempo que he querido hacer un "heat map" con mis datos deportivos, y este proyecto ha sido una de las motivaciones para aprender mas a programar. la siguiente imagen es una heatmap generado con Strava.
@@ -105,8 +107,14 @@ all_data <- read_csv("../raw_data/garmin/csv/2021_jan_activities.csv",
         `Average Speed (km/h or min/km)` = col_double(), 
         `Average Moving Speed (km/h or min/km)` = col_double(), 
         `Max. Speed (km/h or min/km)` = col_double())) %>% 
-   mutate(Año = as.factor(substr(all_data$`Start Time` , start = 1, stop = 4) ) )
+   mutate(Año = as.factor(substr(all_data$`Start Time` , start = 1, stop = 4) ),
+          month = as.numeric(substr(all_data$`Start Time`, start = 6, stop = 7)))
 
+all_data<- all_data %>% 
+   mutate(  mes = as.factor(month.abb[all_data$month])) %>% 
+   select(-month)  
+   
+all_data$mes <- factor(all_data$mes, levels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec") ) 
 
 ## creamos este diccionario con activity ID para agregar el tipo de actividad al dataframe de los gpx 
 
@@ -226,16 +234,28 @@ Aqui ya vemos algunas cosas, vamos a enumerar:
 
 ## y la natacion??
 
+Es tambien interesante, aqui tengo brazadas, horas y metros, cada gráfico en realidad tiene sus problemas, pero la verdad que me alegro de haber utilizado el reloj en todos esos entrenamientos.  
+Que cosas agregan ruido a los gráficos??
++ En tiempo el hecho que algunas veces se me olvida apagar el reloj :-) 
+* hay un mínimo de veces que lo he dejado en casa, 
+* creo que recuerdo dos veces quedarme sin bateria.
+* que es tecnologia relativamente reciente, el primer reloj qeu tuve para nadar lo conseguí en el 2013
+* Las competiciones, la [FINA](http://www.fina.org/), que es el organismo que rige la mayoria de las competiciones en las que participo no permite los relojes (son medio locos), y aun cuando en piscina son  relativamente pocas brazadas, en Aguas Abiertas es diferente cuando empezamos a a participar en algún circuito con varias carreras al año como mi 2019,
+* número de brazadas se afecta porque en ocasiones dejo la opcion "drill mode"que no cuenta brazadas , solo tiempo y distancia. Especialemente los dias de entrenamiento de velocidad donde el reloj molesta un poco.
 
-```{r echo=FALSE, message=FALSE, warning=FALSE}
 
+```{r echo=FALSE, fig.height=5, fig.width=16, message=FALSE, warning=FALSE}
 
+brazadas<-
 all_data %>% mutate(`Activity Parent` = as.factor(`Activity Parent`),
                     `Activity Type` = as.factor(`Activity Type`)
                     ) %>% 
-   drop_na(Strokes) %>% 
+   # drop_na(Strokes) %>% 
    group_by(Año) %>% 
-   summarise(brazadas = sum(Strokes)) %>% 
+   filter(Año != 2012,
+          Año != 2011) %>% 
+   summarise(brazadas = sum(Strokes, na.rm = TRUE),
+             pasos    = sum(Steps, na.rm = TRUE)) %>% 
    ggplot(aes( Año, brazadas) ) +
    geom_bar(stat = "identity", aes(fill= brazadas))  +
    coord_flip()+
@@ -243,14 +263,84 @@ all_data %>% mutate(`Activity Parent` = as.factor(`Activity Parent`),
         x = "", 
         title =  "Brazadas por año"
         )+
-   # scale_fill_viridis_d()+
+   theme_minimal()+
+   theme(axis.text = element_text(face = "bold", size = 14),
+         axis.title.y = element_text(face = "bold", size = 15)
+         )+
+   scale_fill_viridis_c()+
+   scale_y_continuous(labels =  comma)+
+   scale_colour_continuous(labels = comma)
    # scale_y_continuous(labels = seq(0, 1400, 200),
    #                    breaks = seq(0, 1400, 200)
    #                    )+
-   theme_minimal()
+ 
 
+
+
+metros <- 
+   all_data %>% mutate(`Activity Parent` = as.factor(`Activity Parent`),
+                    `Activity Type` = as.factor(`Activity Type`)
+                    ) %>% 
+      filter(`Activity Type` %in% c("Natación en piscina", "Aguas Abiertas")) %>% 
+   # drop_na(Strokes) %>% 
+   group_by(Año) %>% 
+   filter(Año != 2012,
+          Año != 2011) %>% 
+   summarise(`Distance (km)` = sum(`Distance (km)`, na.rm = TRUE)
+             ) %>% 
+   ggplot(aes( Año, `Distance (km)`) ) +
+   geom_bar(stat = "identity", aes(fill= `Distance (km)`))  +
+   coord_flip()+
+   labs(y = "km nadados ",
+        x = "", 
+        title =  "Km nadados por año"
+        )+
+   theme_minimal()+
+   theme(axis.text = element_text(face = "bold", size = 14),
+         axis.title.y = element_text(face = "bold", size = 15)
+         )+
+   scale_fill_viridis_c()+
+   scale_y_continuous(labels =  comma)+
+   scale_colour_continuous(labels = comma)
+
+
+
+horas <- 
+   all_data %>% mutate(`Activity Parent` = as.factor(`Activity Parent`),
+                    `Activity Type` = as.factor(`Activity Type`)
+                    ) %>% 
+      filter(`Activity Type` %in% c("Natación en piscina", "Aguas Abiertas")) %>% 
+   # drop_na(Strokes) %>% 
+   group_by(Año) %>% 
+   filter(Año != 2012,
+          Año != 2011) %>% 
+   summarise(`Duration (h:m:s)` = sum(`Duration (h:m:s)`, na.rm = TRUE)
+             ) %>% 
+   ggplot(aes( Año, `Duration (h:m:s)`/3600) ) +
+   geom_bar(stat = "identity", aes(fill= `Duration (h:m:s)`/3600))  +
+   coord_flip()+
+   labs(y = "horas nadadas ",
+        x = "", 
+        title =  "Horas nadadas por año"
+        )+
+   theme_minimal()+
+   theme(axis.text = element_text(face = "bold", size = 14),
+         axis.title.y = element_text(face = "bold", size = 15)
+         )+
+   scale_fill_viridis_c()+
+   scale_y_continuous(labels =  comma)+
+   scale_colour_continuous(labels = comma)+
+   labs(fill = "horas")
+
+
+
+
+brazadas + metros + horas
 
 ```
+
+
+
 
 
 
